@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AR Hoop — 벽이 농구장이 된다</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#080b12;color:#fff;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}
+  .app{height:100vh;position:relative;isolation:isolate;background:
+    radial-gradient(circle at 50% 35%,rgba(69,93,132,.28),transparent 38%),
+    linear-gradient(145deg,#121827,#05070c)}
+  .camera{position:absolute;inset:0;overflow:hidden}
+  .wall{position:absolute;left:7%;right:7%;top:13%;bottom:0;border:1px solid rgba(255,255,255,.12);
+    background:
+      linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px),
+      linear-gradient(160deg,#303743,#171c25 68%);
+    background-size:42px 42px,42px 42px,100% 100%;
+    transform:perspective(900px) rotateX(2deg)}
+  .floor{position:absolute;left:0;right:0;bottom:-20%;height:34%;
+    background:linear-gradient(165deg,#151a23,#080b11);transform:skewY(-3deg)}
+  .hud{position:absolute;inset:0;z-index:5;pointer-events:none}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;padding:24px}
+  .brand{font-weight:900;letter-spacing:.08em;font-size:20px}
+  .brand span{color:#7dd3fc}
+  .status{margin-top:5px;color:#9ca8bb;font-size:12px}
+  .scorebox{display:flex;gap:10px}
+  .pill{background:rgba(9,13,21,.72);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(16px);
+    border-radius:18px;padding:11px 15px;min-width:92px}
+  .pill small{display:block;color:#8d98aa;font-size:10px;text-transform:uppercase;letter-spacing:.12em}
+  .pill strong{font-size:22px}
+  .hint{position:absolute;top:91px;left:50%;transform:translateX(-50%);background:rgba(7,11,18,.66);
+    border:1px solid rgba(125,211,252,.25);border-radius:999px;padding:9px 16px;color:#dceeff;font-size:13px;backdrop-filter:blur(14px)}
+  .scan{position:absolute;left:50%;top:51%;width:210px;height:150px;transform:translate(-50%,-50%);
+    border:1.5px dashed rgba(125,211,252,.7);border-radius:20px;box-shadow:0 0 35px rgba(56,189,248,.12)}
+  .scan:before,.scan:after{content:"";position:absolute;width:20px;height:20px;border-color:#7dd3fc}
+  .scan:before{left:-2px;top:-2px;border-left:3px solid;border-top:3px solid;border-radius:5px 0 0 0}
+  .scan:after{right:-2px;bottom:-2px;border-right:3px solid;border-bottom:3px solid;border-radius:0 0 5px 0}
+  .hoop{position:absolute;left:50%;top:40%;width:250px;height:220px;transform:translate(-50%,-50%);display:none}
+  .backboard{position:absolute;left:50%;top:0;transform:translateX(-50%);width:185px;height:105px;
+    border:7px solid rgba(245,248,255,.92);border-radius:4px;background:rgba(220,230,240,.12);
+    box-shadow:0 12px 25px rgba(0,0,0,.35)}
+  .square{position:absolute;left:50%;top:30px;transform:translateX(-50%);width:68px;height:52px;border:4px solid #f87171}
+  .rim{position:absolute;left:50%;top:108px;transform:translateX(-50%);width:110px;height:25px;border:7px solid #f97316;
+    border-radius:50%;box-shadow:0 7px 15px rgba(249,115,22,.28)}
+  .net{position:absolute;left:50%;top:119px;transform:translateX(-50%);width:76px;height:70px;
+    border-left:2px dashed rgba(255,255,255,.65);border-right:2px dashed rgba(255,255,255,.65);
+    border-bottom:2px dashed rgba(255,255,255,.65);clip-path:polygon(0 0,100% 0,76% 100%,24% 100%)}
+  .target{position:absolute;left:50%;top:108px;transform:translate(-50%,-50%);width:145px;height:145px;
+    border:1px solid rgba(125,211,252,.45);border-radius:50%;box-shadow:0 0 30px rgba(56,189,248,.08)}
+  .ball{position:absolute;left:50%;bottom:88px;width:72px;height:72px;transform:translateX(-50%);
+    border-radius:50%;background:radial-gradient(circle at 32% 28%,#ffb25f,#f97316 45%,#b9380b 100%);
+    box-shadow:0 14px 30px rgba(0,0,0,.45),0 0 25px rgba(249,115,22,.18);cursor:grab;touch-action:none;z-index:8}
+  .ball:before,.ball:after{content:"";position:absolute;border:2px solid rgba(35,15,7,.72);border-radius:50%}
+  .ball:before{width:82px;height:35px;left:-7px;top:18px;transform:rotate(-28deg)}
+  .ball:after{width:35px;height:82px;left:18px;top:-5px;transform:rotate(25deg)}
+  .power{position:absolute;bottom:42px;left:50%;transform:translateX(-50%);width:270px;height:7px;border-radius:99px;
+    background:rgba(255,255,255,.12);overflow:hidden;display:none}
+  .power i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7dd3fc,#f97316);border-radius:99px}
+  .bottom{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:10;display:flex;gap:9px;pointer-events:auto}
+  button{border:0;color:#fff;font-weight:800;border-radius:14px;padding:12px 16px;cursor:pointer;background:rgba(15,22,34,.82);
+    border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(12px)}
+  button.primary{background:#f97316;border-color:#fb923c;box-shadow:0 8px 24px rgba(249,115,22,.22)}
+  .toast{position:absolute;left:50%;top:24%;transform:translate(-50%,-50%) scale(.9);opacity:0;z-index:20;
+    padding:15px 22px;border-radius:18px;background:rgba(7,11,18,.88);border:1px solid rgba(125,211,252,.28);
+    font-size:24px;font-weight:900;transition:.25s}
+  .toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .center{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);text-align:center;z-index:6}
+  .center h1{font-size:28px;margin:0 0 8px}.center p{margin:0;color:#aab5c6;font-size:14px}
+  .shoot-guide{position:absolute;bottom:166px;left:50%;transform:translateX(-50%);color:#d9e4f1;font-size:12px;z-index:7}
+  @media(max-width:600px){.wall{left:2%;right:2%}.top{padding:15px}.scorebox{gap:6px}.pill{min-width:72px;padding:8px 10px}.pill strong{font-size:18px}.hoop{transform:translate(-50%,-50%) scale(.82)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="camera">
+    <div class="wall"></div><div class="floor"></div>
+    <div class="scan" id="scan"></div>
+    <div class="hoop" id="hoop">
+      <div class="target"></div><div class="backboard"><div class="square"></div></div>
+      <div class="rim"></div><div class="net"></div>
+    </div>
+    <div class="center" id="center">
+      <h1>주변을 스캔하세요</h1><p>카메라를 움직여 벽을 찾으면 농구대가 나타납니다.</p>
+    </div>
+    <div class="ball" id="ball" style="display:none"></div>
+    <div class="power" id="power"><i></i></div>
+    <div class="shoot-guide" id="guide" style="display:none">농구공을 위로 드래그해서 슛!</div>
+  </div>
+
+  <div class="hud">
+    <div class="top">
+      <div><div class="brand">AR <span>HOOP</span></div><div class="status">WALL TRACKING · READY</div></div>
+      <div class="scorebox">
+        <div class="pill"><small>Score</small><strong id="score">0</strong></div>
+        <div class="pill"><small>Combo</small><strong id="combo">x0</strong></div>
+        <div class="pill"><small>Time</small><strong id="time">60</strong></div>
+      </div>
+    </div>
+    <div class="hint" id="hint">① 벽을 탐색하는 중...</div>
+  </div>
+
+  <div class="toast" id="toast">NICE SHOT! 🔥 +2</div>
+  <div class="bottom">
+    <button id="scanBtn" class="primary">벽 인식하기</button>
+    <button id="resetBtn">다시 시작</button>
+  </div>
+</div>
+
+<script>
+const scan=document.getElementById('scan'), hoop=document.getElementById('hoop'), ball=document.getElementById('ball');
+const center=document.getElementById('center'), hint=document.getElementById('hint'), guide=document.getElementById('guide');
+const power=document.getElementById('power'), fill=power.querySelector('i'), toast=document.getElementById('toast');
+const scoreEl=document.getElementById('score'), comboEl=document.getElementById('combo'), timeEl=document.getElementById('time');
+let score=0, combo=0, timer=null, dragging=false, startY=0, startX=0;
+
+function reset(){
+  clearInterval(timer); score=0;combo=0;timeEl.textContent=60;scoreEl.textContent=0;comboEl.textContent='x0';
+  scan.style.display='block'; hoop.style.display='none'; ball.style.display='none'; power.style.display='none'; guide.style.display='none';
+  center.style.display='block'; hint.textContent='① 벽을 탐색하는 중...';
+}
+function detect(){
+  scan.style.display='none'; center.style.display='none'; hoop.style.display='block'; ball.style.display='block'; guide.style.display='block';
+  hint.textContent='② 벽 인식 완료 · 농구대가 고정되었습니다';
+  clearInterval(timer); let t=60; timeEl.textContent=t;
+  timer=setInterval(()=>{t--;timeEl.textContent=t;if(t<=0){clearInterval(timer);hint.textContent='TIME UP · 다시 시작해서 도전하세요';}},1000);
+}
+function showToast(text){
+  toast.textContent=text;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),900);
+}
+function shoot(dx,dy){
+  const strength=Math.min(1,Math.max(.15,Math.abs(dy)/260));
+  const targetX=window.innerWidth/2 + dx*1.8;
+  const targetY=window.innerHeight*.40 - strength*100;
+  const sx=window.innerWidth/2, sy=window.innerHeight-120;
+  ball.style.transition='left .62s cubic-bezier(.2,.7,.2,1),bottom .62s cubic-bezier(.2,.7,.2,1),transform .62s linear';
+  ball.style.left=targetX+'px'; ball.style.bottom=(window.innerHeight-targetY-36)+'px';
+  ball.style.transform='translateX(-50%) scale(.72) rotate(420deg)';
+  setTimeout(()=>{
+    const made=Math.abs(dx)<75 && strength>.25;
+    if(made){score+=2;combo++;scoreEl.textContent=score;comboEl.textContent='x'+combo;showToast(combo>=3?'SUPER COMBO! 🔥 +2':'NICE SHOT! 🔥 +2');}
+    else {combo=0;comboEl.textContent='x0';showToast('MISS · 다시 도전!');}
+    ball.style.transition='none';ball.style.left='50%';ball.style.bottom='88px';ball.style.transform='translateX(-50%)';
+    fill.style.width='0';
+  },700);
+}
+ball.addEventListener('pointerdown',e=>{if(timeEl.textContent==='0')return;dragging=true;startY=e.clientY;startX=e.clientX;ball.setPointerCapture(e.pointerId);power.style.display='block'});
+ball.addEventListener('pointermove',e=>{if(!dragging)return;const dy=startY-e.clientY;fill.style.width=Math.min(100,Math.max(0,dy/2.6))+'%'});
+ball.addEventListener('pointerup',e=>{if(!dragging)return;dragging=false;power.style.display='none';shoot(e.clientX-startX,startY-e.clientY)});
+document.getElementById('scanBtn').onclick=detect;
+document.getElementById('resetBtn').onclick=reset;
+reset();
+</script>
+</body>
+</html>
